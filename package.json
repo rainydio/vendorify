@@ -28,5 +28,8 @@
   },
   "peerDependencies": {
     "browserify": "^13.1.0"
-  }
+  },
+  "repository": "github:rainydio/vendorify.git",
+  "bugs": "https://github.com/rainydio/vendorify/issues",
+  "homepage": "https://github.com/rainydio/vendorify#readme"
 }
