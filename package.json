@@ -1,0 +1,32 @@
+{
+  "name": "vendorify",
+  "version": "0.0.0",
+  "description": "Bundle node_modules dependencies into separate file",
+  "main": "index.js",
+  "bin": "bin/cmd.js",
+  "scripts": {
+    "prepublish": "eslint ."
+  },
+  "keywords": [
+    "browserify",
+    "browserify-plugin",
+    "browserify-tool",
+    "bundle"
+  ],
+  "author": "Dmitry Tyschenko",
+  "license": "MIT",
+  "devDependencies": {
+    "browserify": "^13.1.0",
+    "eslint": "^3.7.1"
+  },
+  "dependencies": {
+    "array-difference": "^0.0.1",
+    "array-some": "^1.0.0",
+    "object-assign": "^4.1.0",
+    "object.pick": "^1.1.2",
+    "through2": "^2.0.1"
+  },
+  "peerDependencies": {
+    "browserify": "^13.1.0"
+  }
+}
