@@ -3,39 +3,11 @@
 var fs = require("fs");
 var path = require("path");
 var through = require("through2");
-var browserify = require("browserify");
-var arrsome = require("array-some");
-var arrdiff = require("array-difference");
-var objassign = require("object-assign");
-var objpick = require("object.pick");
+var bpack = require("browser-pack");
+var vendorifyMdeps = require("./vendorify-mdeps");
 
 function noop(obj, enc, done) {
 	done(null, obj);
-}
-
-var optionsToCopy = [
-	"extensions",
-	"ignoreTransform",
-	"fullPaths",
-	"builtins",
-	"commondir",
-	"basedir",
-	"browserField",
-	"dedupe",
-	"detectGlobals",
-	"insertGlobals",
-	"insertGlobalVars",
-	"ignoreMissing",
-	"cache",
-	"pkgCache",
-];
-
-function isExternalModule(id) {
-	var regexp = process.platform === "win32"
-		? /^(\.|\w:)/
-		: /^[\/.]/;
-
-	return !regexp.test(id);
 }
 
 function generateVendorFilename(bundleFileName) {
@@ -57,6 +29,7 @@ function vendorify(b, opts) {
 	opts.outfile = opts.o || opts.outfile || generateVendorFilename(b.argv.outfile);
 
 	var out;
+
 	if (typeof opts.outfile === "string") {
 		out = function () {
 			return fs.createWriteStream(opts.outfile);
@@ -69,78 +42,86 @@ function vendorify(b, opts) {
 		throw new Error("Wait, what is it?");
 	}
 
-	var externals = [];
-	var bundledExternals = [];
-	var bundledFiles = [];
-	var updatedFiles = [];
+	var files = null;
+	var exposed = null;
+	var updated = [];
 
-	b._options.bundleExternal = false;
-
-	var bbOpts = objassign({ }, objpick(b._options, optionsToCopy));
-	var bb = browserify(bbOpts);
-
-	function bundle(done) {
-		var filesUpdated = arrsome(updatedFiles, function (f) {
-			return bundledFiles.indexOf(f) !== -1;
-		});
-		var externalsUpdated = arrdiff(
-			bundledExternals, externals
-		).length !== 0;
-
-		if (filesUpdated === false && externalsUpdated === false) {
-			done();
-			return;
+	function needBundle() {
+		if (files === null) {
+			return true;
 		}
 
-		bb.reset();
-		bb._transforms = b._transforms;
-
-		for (var i = 0, l = externals.length; i < l; i++) {
-			bb.require(externals[i]);
-		}
-
-		var bundled = bb.bundle()
-			.once("error", done);
-
-		bundled.pipe(out())
-			.once("error", done)
-			.once("finish", function () {
-				updatedFiles = [];
-				bundledExternals = externals;
-				done();
-			});
-	}
-
-	function reset() {
-		externals = [];
-
-		b.pipeline.get("pack").unshift(through.obj(noop, bundle));
-		b.pipeline.get("deps").push(through.obj(function (row, enc, done) {
-			for (var dep in row.deps) {
-				if (row.deps.hasOwnProperty(dep)) {
-					if (row.deps[dep] === false && isExternalModule(dep)) {
-						if (externals.indexOf(dep) === -1) {
-							externals.push(dep);
-						}
-					}
+		for (var ui = 0, ul = updated.length; ui < ul; ui++) {
+			for (var fi = 0, fl = files.length; fi < fl; fi++) {
+				if (updated[ui] === files[fi]) {
+					return true;
 				}
 			}
-			done(null, row);
-		}));
+		}
+
+		return false;
 	}
 
-	bb.on("error", b.emit.bind(b, "error"));
-	bb.on("file", b.emit.bind(b, "file"));
+	function track(row) {
+		files.push(row.id);
+		if (row.expose) {
+			exposed.push(row.expose);
+		}
+	}
 
-	bb.on("file", function (file) {
-		bundledFiles.push(file);
-	});
-	b.on("update", function (files) {
-		updatedFiles.push.apply(updatedFiles, files);
+	function setup() {
+		if (needBundle()) {
+			var emitError = b.emit.bind(b, "error");
+			var vendor = through.obj();
+
+			files = [];
+			updated = [];
+			exposed = [];
+
+			var flushed = vendor
+				.on("error", emitError)
+				.pipe(through.obj(function (row, enc, next) {
+					track(row);
+					next(null, row);
+				}))
+				.pipe(through.obj(function (row, enc, next) {
+					row = opts.debug
+						? row
+						: Object.assign({ }, row, { nomap: true });
+					next(null, row);
+				}))
+				.pipe(bpack({ raw: true, hasExports: true }))
+				.on("error", emitError)
+				.pipe(out())
+				.on("error", emitError);
+
+			b.pipeline.get("deps").push(vendorifyMdeps(vendor));
+			b.pipeline.get("pack").push(through.obj(noop, function (end) {
+				if (flushed.closed) {
+					end();
+				}
+				else {
+					flushed.once("finish", function () {
+						end();
+					});
+				}
+			}));
+		}
+		else {
+			// if vendor file is already bundled
+			// just hint browserify that they are external
+			exposed.forEach(function (ref) {
+				b.external(ref);
+			});
+		}
+	}
+
+	b.on("update", function (ids) {
+		updated.push.apply(updated, ids);
 	});
 
-	b.on("reset", reset);
-	reset();
+	b.on("reset", setup);
+	setup();
 
 	return b;
 }

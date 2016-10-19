@@ -1,11 +1,12 @@
 {
   "name": "vendorify",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Bundle node_modules dependencies into separate file",
   "main": "index.js",
   "bin": "bin/cmd.js",
   "scripts": {
-    "prepublish": "eslint ."
+    "prepublish": "eslint .",
+    "test": "tape test.js | tap-difflet"
   },
   "keywords": [
     "browserify",
@@ -16,18 +17,17 @@
   "author": "Dmitry Tyschenko",
   "license": "MIT",
   "devDependencies": {
-    "browserify": "^13.1.0",
-    "eslint": "^3.7.1"
+    "browserify": "^13.1.1",
+    "eslint": "^3.7.1",
+    "tap-difflet": "^0.7.0",
+    "tape": "^4.6.2"
   },
   "dependencies": {
-    "array-difference": "^0.0.1",
-    "array-some": "^1.0.0",
-    "object-assign": "^4.1.0",
-    "object.pick": "^1.1.2",
+    "browser-pack": "^6.0.1",
     "through2": "^2.0.1"
   },
   "peerDependencies": {
-    "browserify": "^13.1.0"
+    "browserify": "*"
   },
   "repository": "github:rainydio/vendorify.git",
   "bugs": "https://github.com/rainydio/vendorify/issues",

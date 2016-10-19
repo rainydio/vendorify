@@ -109,7 +109,7 @@ module.exports = {
 		"no-undef": "warn",
 		"no-undef-init": "warn",
 		"no-unused-vars": "warn",
-		"no-use-before-define": "warn",
+		"no-use-before-define": ["warn", { "functions": false }],
 
 
 		"handle-callback-err": "warn",
