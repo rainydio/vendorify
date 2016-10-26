@@ -1,6 +1,6 @@
 {
   "name": "vendorify",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Bundle node_modules dependencies into separate file",
   "main": "index.js",
   "bin": "bin/cmd.js",

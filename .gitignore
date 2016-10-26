@@ -1,3 +1,4 @@
 node_modules/
-yarn.lock
 .envrc
+npm-debug.log
+yarn.lock
