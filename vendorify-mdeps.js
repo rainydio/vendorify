@@ -11,31 +11,11 @@ function isExternalReference(id) {
 }
 
 function vendorifyMdeps(vendor) {
-	var rows = { };
-	var processed = [];
-	var mainWaiting = [];
-	var vendorWaiting = [];
-	var required = { };
-	var requireWaiting = [];
-
 	var main;
-
-	function waitOrProcess(id, waiting, process) {
-		if (rows.hasOwnProperty(id)) {
-			process(rows[id]);
-		}
-		else if (waiting.indexOf(id) === -1) {
-			waiting.push(id);
-		}
-	}
-
-	function processIfWaiting(row, waiting, process) {
-		var indx = waiting.indexOf(row.id);
-		if (indx !== -1) {
-			waiting.splice(indx, 1);
-			process(row);
-		}
-	}
+	var rows = { };
+	var references = { };
+	var waiting = [];
+	var processed = [];
 
 	function processVendor(row) {
 		if (processed.indexOf(row.id) !== -1) {
@@ -45,22 +25,31 @@ function vendorifyMdeps(vendor) {
 
 		Object.keys(row.deps).forEach(function (ref) {
 			var depId = row.deps[ref];
-
-			if (isExternalReference(ref) && required.hasOwnProperty(depId) === false) {
-				if (requireWaiting.indexOf(depId) === -1) {
-					requireWaiting.push(depId);
-				}
-			}
-			else {
-				waitOrProcess(depId, vendorWaiting, processVendor);
+			if (depId !== false) {
+				processVendor(rows[depId]);
 			}
 		});
 
-		if (required.hasOwnProperty(row.id)) {
-			row = Object.assign({ }, row, {
-				expose: required[row.id],
-			});
-		}
+		var exposed = references.hasOwnProperty(row.id)
+			? { id: references[row.id], expose: references[row.id] }
+			: { };
+
+		var deps = { };
+		Object.keys(row.deps).forEach(function (ref) {
+			var depId = row.deps[ref];
+
+			if (depId === false) {
+				deps[ref] = false;
+			}
+			else if (references.hasOwnProperty(depId)) {
+				deps[ref] = references[depId];
+			}
+			else {
+				deps[ref] = depId;
+			}
+		});
+
+		row = Object.assign({ }, row, exposed, { deps: deps });
 
 		vendor.push(row);
 	}
@@ -76,20 +65,22 @@ function vendorifyMdeps(vendor) {
 		Object.keys(row.deps).forEach(function (ref) {
 			var depId = row.deps[ref];
 
-			if (isExternalReference(ref)) {
+			if (depId === false) {
 				deps[ref] = false;
-				required[depId] = ref;
-
-				var indx = requireWaiting.indexOf(depId) !== -1;
-				if (indx !== -1) {
-					requireWaiting.splice(indx, 1);
-				}
-
-				waitOrProcess(depId, vendorWaiting, processVendor);
+			}
+			else if (isExternalReference(ref)) {
+				references[depId] = ref;
+				deps[ref] = false;
 			}
 			else {
 				deps[ref] = depId;
-				waitOrProcess(depId, mainWaiting, processMain);
+
+				if (rows.hasOwnProperty(depId)) {
+					processMain(rows[depId]);
+				}
+				else if (waiting.indexOf(depId) === -1) {
+					waiting.push(depId);
+				}
 			}
 		});
 
@@ -101,8 +92,11 @@ function vendorifyMdeps(vendor) {
 	main = through.obj(function (row, enc, next) {
 		rows[row.id] = row;
 
-		processIfWaiting(row, mainWaiting, processMain);
-		processIfWaiting(row, vendorWaiting, processVendor);
+		var indx = waiting.indexOf(row.id);
+		if (indx !== -1) {
+			waiting.splice(indx, 1);
+			processMain(row);
+		}
 
 		if (row.entry) {
 			processMain(row);
@@ -110,6 +104,9 @@ function vendorifyMdeps(vendor) {
 
 		next();
 	}, function (finish) {
+		Object.keys(references).forEach(function (id) {
+			processVendor(rows[id]);
+		});
 		vendor.end();
 		finish();
 	});

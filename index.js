@@ -43,7 +43,7 @@ function vendorify(b, opts) {
 	}
 
 	var files = null;
-	var exposed = null;
+	var exposed = [];
 	var updated = [];
 
 	function needBundle() {
@@ -71,6 +71,13 @@ function vendorify(b, opts) {
 
 	function setup() {
 		if (needBundle()) {
+			exposed.forEach(function (ref) {
+				var indx = b._external.indexOf(ref);
+				if (indx !== -1) {
+					b._external.splice(indx, 1);
+				}
+			});
+
 			var emitError = b.emit.bind(b, "error");
 			var vendor = through.obj();
 

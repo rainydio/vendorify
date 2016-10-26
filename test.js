@@ -139,7 +139,7 @@ test("entry with external reference", function (t) {
 			{ id: 1, deps: { "external": false }, entry: true },
 		]);
 		t.deepEquals(p.vendor, [
-			{ id: 2, deps: { }, expose: "external" },
+			{ id: "external", deps: { }, expose: "external" },
 		]);
 		t.end();
 	});
@@ -172,7 +172,41 @@ test("entry with external tree of references", function (t) {
 		]);
 		t.deepEquals(p.vendor, [
 			{ id: 3, deps: { }},
-			{ id: 2, deps: { "./external-internal": 3 }, expose: "external" },
+			{ id: "external", deps: { "./external-internal": 3 }, expose: "external" },
+		]);
+		t.end();
+	});
+});
+
+test("entry with two externals where one also references another", function (t) {
+	var p = prepare();
+	p.input.write({
+		id: 3,
+		deps: { },
+	});
+	p.input.write({
+		id: 2,
+		deps: {
+			"external-three": 3,
+		},
+	});
+	p.input.write({
+		id: 1,
+		deps: {
+			"external-two": 2,
+			"external-three": 3,
+		},
+		entry: true,
+	});
+	p.input.end();
+
+	p.done(function () {
+		t.deepEquals(p.main, [
+			{ id: 1, deps: { "external-two": false, "external-three": false }, entry: true },
+		]);
+		t.deepEquals(p.vendor, [
+			{ id: "external-three", deps: { }, expose: "external-three" },
+			{ id: "external-two", deps: { "external-three": "external-three" }, expose: "external-two" },
 		]);
 		t.end();
 	});
